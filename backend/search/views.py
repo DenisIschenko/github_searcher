@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from backend.search.serializers import SearchRequestSerializer
+from search.serializers import SearchRequestSerializer
 
 
 @extend_schema(
