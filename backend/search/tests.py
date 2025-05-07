@@ -1,9 +1,12 @@
-from rest_framework.test import APITestCase, APIClient
-from rest_framework import status
-from django.urls import reverse
-from unittest.mock import patch
+import time
+from unittest.mock import patch, MagicMock
+
 from django.core.cache import cache
+from django.test import override_settings
+from django.urls import reverse
 from requests.exceptions import RequestException
+from rest_framework import status
+from rest_framework.test import APITestCase, APIClient
 
 from search.serializers import SearchRequestSerializer
 
@@ -29,7 +32,6 @@ class GitHubSearchViewTest(APITestCase):
     def setUp(self):
         self.client = APIClient()
         self.url = reverse("github-search")
-        self.url_clean = reverse("clear-cache")
         cache.clear()
 
     @patch("search.views.requests.get")
@@ -43,7 +45,6 @@ class GitHubSearchViewTest(APITestCase):
 
     @patch("search.views.requests.get")
     def test_github_api_failure(self, mock_get):
-        # self.client.post(self.url_clean)
         mock_get.side_effect = RequestException("GitHub is down")
 
         response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
@@ -61,3 +62,59 @@ class GitHubSearchViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["items"][0]["id"], 99)
         mock_get.assert_not_called()
+
+
+ttl = 2  # seconds
+
+
+class CacheTest(APITestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("github-search")
+        cache.clear()
+
+    @override_settings(GITHUB_SEARCH_CACHE_TIMEOUT=ttl)
+    @patch("search.views.requests.get")
+    def test_cache_ttl_expiry(self, mock_get):
+        cache_key = "users:john"
+
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"items": [{"id": 1, "login": "john"}]}
+
+        # Cache the response
+        response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
+        self.assertEqual(response.status_code, 200)
+
+        # Check if the cache is set
+        self.assertIsNotNone(cache.get(cache_key))
+
+        # Wait while the cache expires
+        time.sleep(ttl + 1)
+
+        # Cache should be expired
+        self.assertIsNone(cache.get(cache_key))
+
+    @patch("search.views.requests.get")
+    def test_response_is_cached_only_on_200(self, mock_get):
+        cache_key = "users:john"
+
+        # --- Case: 500 --- #
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {"message": "Server error"}
+        mock_get.return_value = mock_response
+
+        response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
+        self.assertEqual(response.status_code, 500)
+        self.assertIsNone(cache.get(cache_key), msg="Cache should not be created on 500 error")
+
+        cache.clear()
+
+        # --- Case: 200 --- #
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"items": [{"id": 1, "login": "john"}]}
+
+        response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(cache.get(cache_key), msg="Cache should be created on 200 response")

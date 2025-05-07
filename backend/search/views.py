@@ -1,6 +1,7 @@
 import os
 
 import requests
+from django.conf import settings
 from django.core.cache import cache
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -38,7 +39,6 @@ class GitHubSearchView(APIView):
         url = f"{os.getenv("GITHUB_LINK")}{search_type}?q={query}&per_page=10&page=1"
         headers = {"Accept": "application/vnd.github+json"}
 
-
         try:
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
@@ -46,7 +46,8 @@ class GitHubSearchView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         data = response.json()
-        cache.set(cache_key, data, timeout=60 * 60 * 2)  # 2 hours
+        if response.status_code == 200:
+            cache.set(cache_key, data, timeout=settings.GITHUB_SEARCH_CACHE_TIMEOUT)  # 2 hours
         return Response(data)
 
 
