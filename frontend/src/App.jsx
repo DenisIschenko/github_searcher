@@ -63,7 +63,7 @@ function App() {
                         style={{width: 48, height: 48}}
                     />
                     <div className={"title"}>
-                        <h5>GitHub Searcher</h5>
+                        <h3>GitHub Searcher</h3>
                         <p>Search users or repositories below</p>
                     </div>
                 </div>

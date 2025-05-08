@@ -6,14 +6,26 @@ function SearchForm({query, entity, loaning, onQueryChange, onEntityChange}) {
         {value: 'users', label: 'User'},
         {value: 'repositories', label: 'Repository'}
     ]
+    const customStyles = {
+        control: (styles) => ({
+            ...styles,
+            borderRadius: "0",
+            borderColor: "#b5b4b4",
+        }),
+        singleValue: (provided) => ({
+            ...provided,
+            color: "#b5b4b4",
+        }),
+    }
     return (
         <div className="search_form">
             <input name="search_input"
-                   placeholder="Search"
+                   placeholder="Start tuping to search..."
                    value={query}
                    onChange={(e) => onQueryChange(e.target.value)}
                    disabled={loaning}
             />
+
             <Select
                 onChange={(e) => onEntityChange(e.value)}
                 // value={entity}
@@ -25,6 +37,10 @@ function SearchForm({query, entity, loaning, onQueryChange, onEntityChange}) {
                 options={options}
                 isSearchable={false}
                 isDisabled={loaning}
+                components={{
+                    IndicatorSeparator: () => null
+                }}
+                styles={customStyles}
             />
         </div>
     );
