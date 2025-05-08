@@ -36,12 +36,23 @@ class GitHubSearchViewTest(APITestCase):
 
     @patch("search.views.requests.get")
     def test_successful_search(self, mock_get):
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.json.return_value = {"items": [{"id": 1, "name": "test"}]}
+        mock_response1 = MagicMock()
+        mock_response1.status_code = 200
+        mock_response1.json.return_value = {"items": [{"id": 1, "login": "test"}]}
+
+        mock_response2 = MagicMock()
+        mock_response2.status_code = 200
+        mock_response2.json.return_value = {"id": 1, "login": "test"}
+
+        mock_get.side_effect = [mock_response1, mock_response2]
+
+        # mock_get.return_value.status_code = 200
+        # mock_get.return_value.json.return_value = {"items": [{"id": 1, "name": "test"}]}
 
         response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("items", response.data)
+        self.assertIn("login", response.data[0])
+        self.assertIn("test", response.data[0]['login'])
 
     @patch("search.views.requests.get")
     def test_github_api_failure(self, mock_get):
@@ -79,8 +90,18 @@ class CacheTest(APITestCase):
     def test_cache_ttl_expiry(self, mock_get):
         cache_key = "users:john"
 
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.json.return_value = {"items": [{"id": 1, "login": "john"}]}
+        mock_response1 = MagicMock()
+        mock_response1.status_code = 200
+        mock_response1.json.return_value = {"items": [{"id": 1, "login": "john"}]}
+
+        mock_response2 = MagicMock()
+        mock_response2.status_code = 200
+        mock_response2.json.return_value = {"id": 1, "login": "john"}
+
+        mock_get.side_effect = [mock_response1, mock_response2]
+
+        # mock_get.return_value.status_code = 200
+        # mock_get.return_value.json.return_value = {"items": [{"id": 1, "login": "john"}]}
 
         # Cache the response
         response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
@@ -97,24 +118,28 @@ class CacheTest(APITestCase):
 
     @patch("search.views.requests.get")
     def test_response_is_cached_only_on_200(self, mock_get):
-        cache_key = "users:john"
+        cache_key = "users:john_new"
 
         # --- Case: 500 --- #
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.json.return_value = {"message": "Server error"}
-        mock_get.return_value = mock_response
+        mock_get.side_effect = RequestException("GitHub is down")
 
-        response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
-        self.assertEqual(response.status_code, 500)
+        response = self.client.post(self.url, {"type": "users", "query": "john_new"}, format="json")
+        self.assertEqual(response.status_code, 502)
         self.assertIsNone(cache.get(cache_key), msg="Cache should not be created on 500 error")
 
         cache.clear()
 
         # --- Case: 200 --- #
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"items": [{"id": 1, "login": "john"}]}
+        mock_response1 = MagicMock()
+        mock_response1.status_code = 200
+        mock_response1.json.return_value = {"items": [{"id": 1, "login": "john_new"}]}
 
-        response = self.client.post(self.url, {"type": "users", "query": "john"}, format="json")
+        mock_response2 = MagicMock()
+        mock_response2.status_code = 200
+        mock_response2.json.return_value = {"id": 1, "login": "john_new"}
+
+        mock_get.side_effect = [mock_response1, mock_response2]
+
+        response = self.client.post(self.url, {"type": "users", "query": "john_new"}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(cache.get(cache_key), msg="Cache should be created on 200 response")

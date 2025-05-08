@@ -50,7 +50,7 @@ class GitHubSearchView(APIView):
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             serialized_data = self.__process_search_data(response.json(), search_type)
-        except requests.RequestException as e:
+        except (requests.RequestException, requests.HTTPError) as e:
             return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if response.status_code == 200:
