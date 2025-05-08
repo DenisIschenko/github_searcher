@@ -3,7 +3,7 @@ import os
 import requests
 from django.conf import settings
 from django.core.cache import cache
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, PolymorphicProxySerializer
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,7 +22,11 @@ headers = {
     tags=["search"],
     request=SearchRequestSerializer,
     responses={
-        200: "Success", 400: "Invalid input", 502: "GitHub error"
+        200: PolymorphicProxySerializer(
+            component_name="SearchResponseSerializer",
+            serializers=[SearchUserResponseSerializer, SearchRepositoryResponseSerializer],
+            resource_type_field_name=None,
+        ), 400: "Invalid input", 502: "GitHub error"
     },
 )
 class GitHubSearchView(APIView):
