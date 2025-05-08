@@ -152,3 +152,4 @@ CACHES = {
 }
 
 GITHUB_SEARCH_CACHE_TIMEOUT = 60 * 60 * 2  # 2 hours
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
